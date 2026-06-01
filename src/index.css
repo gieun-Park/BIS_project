@@ -1,0 +1,482 @@
+:root {
+  --bg: #f7f9fb;
+  --surface: #ffffff;
+  --surface-soft: #eef6f4;
+  --text: #18212f;
+  --muted: #667085;
+  --line: #dbe3ea;
+  --primary: #007f73;
+  --primary-dark: #00685f;
+  --blue: #2f6fed;
+  --orange: #f08c00;
+  --red: #e03131;
+  --green: #2b8a3e;
+  --shadow: 0 12px 32px rgba(24, 33, 47, 0.08);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100svh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+.bus-app {
+  width: min(960px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.bus-app__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.bus-app__eyebrow,
+.arrival-panel__label,
+.arrival-panel__meta,
+.station-result small,
+.arrival-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.bus-app h1,
+.arrival-panel h2 {
+  margin: 0;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+
+.bus-app h1 {
+  font-size: 30px;
+}
+
+.bus-app__eyebrow {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.auto-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.auto-refresh input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.search-panel,
+.arrival-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.search-panel {
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.search-panel__form {
+  display: grid;
+  grid-template-columns: 1fr 92px;
+  gap: 8px;
+}
+
+.search-panel input {
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--text);
+  background: #fff;
+}
+
+.search-panel input:focus {
+  outline: 3px solid rgba(0, 127, 115, 0.18);
+  border-color: var(--primary);
+}
+
+.search-panel button,
+.arrival-panel__actions button,
+.station-chip,
+.station-result,
+.arrival-card {
+  cursor: pointer;
+}
+
+.search-panel__form button,
+.arrival-panel__actions button {
+  min-height: 44px;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+}
+
+.search-panel__form button:hover,
+.arrival-panel__actions button:hover {
+  background: var(--primary-dark);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.status-message {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.status-message--warn {
+  background: #fff4e6;
+  color: #b86200;
+}
+
+.status-message--error {
+  background: #fff5f5;
+  color: var(--red);
+}
+
+.quick-stations {
+  margin-top: 12px;
+}
+
+.quick-stations__label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.quick-stations__list,
+.station-results {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.station-chip {
+  flex: 0 0 auto;
+  max-width: 180px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--text);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.station-chip--active {
+  border-color: var(--primary);
+  background: var(--surface-soft);
+  color: var(--primary-dark);
+}
+
+.map-panel {
+  margin-bottom: 12px;
+}
+
+.map-panel__canvas {
+  width: 100%;
+  height: 360px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #e9eef3;
+}
+
+.map-panel__status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bus-location-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  margin: 0 0 12px;
+  border: 1px solid rgba(47, 111, 237, 0.22);
+  border-radius: 8px;
+  padding: 9px 12px;
+  background: #eef4ff;
+  color: var(--text);
+}
+
+.bus-location-status strong {
+  color: var(--blue);
+}
+
+.bus-location-status span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.station-results {
+  margin-bottom: 12px;
+}
+
+.station-result {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 260px;
+  min-height: 68px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.station-result strong,
+.station-result small {
+  display: block;
+}
+
+.station-result--active {
+  border-color: var(--primary);
+  background: var(--surface-soft);
+}
+
+.station-result__arrow {
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.arrival-panel {
+  padding: 16px;
+}
+
+.arrival-panel__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.arrival-panel__label,
+.arrival-panel__meta {
+  margin: 0;
+}
+
+.arrival-panel__label {
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.arrival-panel h2 {
+  margin: 4px 0 8px;
+  font-size: 22px;
+}
+
+.arrival-panel__actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.arrival-panel__actions button:first-child {
+  background: var(--blue);
+}
+
+.arrival-panel__actions button:first-child:hover {
+  background: #275dcc;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 22px;
+  border-radius: 8px;
+  background: #f4f7fa;
+  color: var(--muted);
+  text-align: center;
+  font-weight: 700;
+}
+
+.arrival-list {
+  display: grid;
+  gap: 10px;
+}
+
+.arrival-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 68px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #fff;
+  color: var(--text);
+  text-align: left;
+}
+
+.arrival-card:hover,
+.arrival-card:focus-visible {
+  border-color: var(--blue);
+  outline: 0;
+}
+
+.arrival-card--active {
+  border-color: var(--blue);
+  background: #eef4ff;
+}
+
+.arrival-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 22px;
+  color: var(--red);
+}
+
+.arrival-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.arrival-card__meta em {
+  color: var(--blue);
+  font-style: normal;
+  font-weight: 900;
+}
+
+.arrival-badge {
+  flex: 0 0 auto;
+  min-width: 112px;
+  border-radius: 999px;
+  padding: 8px 10px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.arrival-badge--soon {
+  background: #fff5f5;
+  color: var(--red);
+}
+
+.arrival-badge--medium {
+  background: #fff4e6;
+  color: var(--orange);
+}
+
+.arrival-badge--later {
+  background: #ebfbee;
+  color: var(--green);
+}
+
+@media (max-width: 640px) {
+  .bus-app {
+    padding: 16px;
+  }
+
+  .bus-app__header,
+  .arrival-panel__top {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bus-app h1 {
+    font-size: 26px;
+  }
+
+  .search-panel__form {
+    grid-template-columns: 1fr 76px;
+  }
+
+  .map-panel__canvas {
+    height: 300px;
+  }
+
+  .bus-location-status {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .station-result {
+    flex-basis: 220px;
+  }
+
+  .arrival-panel__actions {
+    justify-content: stretch;
+  }
+
+  .arrival-panel__actions button {
+    flex: 1 1 0;
+  }
+
+  .arrival-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .arrival-badge {
+    width: 100%;
+  }
+}
