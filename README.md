@@ -46,7 +46,7 @@
 
 배포 전 정리 필요:
 
-- 현재 API 키가 소스 코드에 직접 들어가 있습니다. 배포 전 `.env` 기반 환경 변수로 분리해야 합니다.
+- API 키는 `.env.local`에서 관리합니다. `.env.local`은 Git에 포함하지 않습니다.
 - `LICENSE`, `src/App.css`, `src/assets/`, `public/icons.svg`는 현재 앱 기능에 직접 사용되지 않는 잔여 파일입니다.
 - README는 현재 프로젝트 기준으로 업데이트되었지만, 배포 URL과 실제 운영 정책은 추후 추가가 필요합니다.
 
@@ -84,12 +84,34 @@ https://apis.data.go.kr/1613000/BusLcInfoInqireService
 
 카카오 지도는 `src/api/kakaoMap.js`에서 JavaScript SDK를 동적으로 로드합니다.
 
-현재 JS 키도 소스 코드에 직접 설정되어 있으므로, 운영 배포 전 환경 변수로 분리하는 것을 권장합니다.
+Kakao Maps JavaScript 키는 `VITE_KAKAO_MAP_JS_KEY` 환경 변수로 주입합니다.
 
-## 6. 폴더 구조
+## 6. 환경 변수
+
+Vite 클라이언트 코드에서 사용하는 환경 변수는 `VITE_` prefix가 필요합니다.
+
+로컬 개발용 파일:
+
+```txt
+.env.local
+```
+
+필요한 변수:
+
+```env
+VITE_DATA_GO_KR_SERVICE_KEY=your_data_go_kr_service_key
+VITE_KAKAO_MAP_JS_KEY=your_kakao_map_javascript_key
+```
+
+`.env.local`은 Git에 올리지 않고, 공유용 변수 목록은 `.env.example`에만 기록합니다.
+
+주의: Vite 프론트엔드 환경 변수는 브라우저 번들에 포함됩니다. 따라서 키를 소스 코드에서 분리하더라도 최종 사용자에게 완전히 숨겨지는 것은 아닙니다. 배포 시에는 API 제공처의 도메인 제한, 사용량 제한, 키 재발급 정책을 함께 적용해야 합니다.
+
+## 7. 폴더 구조
 
 ```txt
 BIS_project/
+├── .env.example
 ├── public/
 │   └── favicon.svg
 ├── src/
@@ -117,7 +139,7 @@ BIS_project/
 └── vite.config.js
 ```
 
-## 7. 실행 방법
+## 8. 실행 방법
 
 의존성 설치:
 
@@ -143,7 +165,7 @@ npm run build
 npm run preview
 ```
 
-## 8. 테스트 및 검증
+## 9. 테스트 및 검증
 
 단위 테스트:
 
@@ -163,7 +185,7 @@ npm run lint
 npm run build
 ```
 
-## 9. 주요 파일 설명
+## 10. 주요 파일 설명
 
 - `src/api/apiClient.js`: 공공데이터포털 도착 정보 API용 Axios client
 - `src/api/busApi.js`: 정류소 검색, 도착 정보, 버스 위치 API 호출
@@ -174,11 +196,11 @@ npm run build
 - `src/screens/BusArrivalScreen.jsx`: 검색, 지도, 도착 정보, 노선 선택 상태를 관리하는 메인 화면
 - `src/index.css`: 앱 전체 UI 스타일
 
-## 10. 배포 전 체크리스트
+## 11. 배포 전 체크리스트
 
-- 공공데이터포털 API 키를 `.env`로 이동
-- 카카오 지도 JS 키를 `.env`로 이동
-- API 키가 Git 기록에 남지 않도록 별도 키 재발급 검토
+- 기존 커밋 기록에 포함된 API 키 재발급 검토
+- 배포 환경에 `VITE_DATA_GO_KR_SERVICE_KEY` 등록
+- 배포 환경에 `VITE_KAKAO_MAP_JS_KEY` 등록
 - 카카오 개발자 콘솔에서 배포 도메인 등록
 - 공공데이터포털 서비스별 활용 신청 상태 확인
 - 앱 이름, favicon, README 배포 URL 정리

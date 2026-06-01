@@ -1,4 +1,4 @@
-const KAKAO_MAP_JS_KEY = 'bb9968c9a5710885be8c1613c5e0b24e';
+const KAKAO_MAP_JS_KEY = import.meta.env?.VITE_KAKAO_MAP_JS_KEY ?? '';
 const KAKAO_MAP_SDK_ID = 'kakao-map-sdk';
 
 let kakaoMapSdkPromise = null;
