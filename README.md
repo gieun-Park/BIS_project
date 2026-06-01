@@ -40,9 +40,9 @@
 
 확인된 API:
 
-- `ArvlInfoInqireService`: 정류소별 실시간 도착 정보
-- `BusSttnInfoInqireService`: 정류소명 기반 정류소 검색
-- `BusLcInfoInqireService`: 노선별 실시간 버스 위치
+- TAGO 버스 도착 정보
+- TAGO 버스 정류소 정보
+- TAGO 버스 위치 정보
 
 배포 전 정리 필요:
 
@@ -64,13 +64,11 @@
 
 ### 공공데이터포털
 
-사용 중인 엔드포인트:
+사용 중인 서비스:
 
-```txt
-https://apis.data.go.kr/1613000/ArvlInfoInqireService
-https://apis.data.go.kr/1613000/BusSttnInfoInqireService
-https://apis.data.go.kr/1613000/BusLcInfoInqireService
-```
+- TAGO 버스 도착 정보
+- TAGO 버스 정류소 정보
+- TAGO 버스 위치 정보
 
 주요 요청 파라미터:
 
