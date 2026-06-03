@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { getBusLocationKey, getBusLocationPosition } from '../api/busData';
+import {
+  getBusLocationKey,
+  getBusLocationPosition,
+  getRoutePath,
+  getRouteStationPosition
+} from '../api/busData';
 import {
   getMapStations,
   getStationMarkerTone,
@@ -14,6 +19,8 @@ const MARKER_COLORS = {
 };
 const BUS_MARKER_COLOR = '#2f6fed';
 const BUS_MARKER_ANIMATION_MS = 900;
+const ROUTE_LINE_COLOR = '#d6336c';
+const ROUTE_STATION_COLOR = '#495057';
 
 const escapeHtml = (value) =>
   String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -49,6 +56,16 @@ const createBusMarkerSvgUrl = () => {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
+const createRouteStationMarkerSvgUrl = () => {
+  const svg = `
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="9" cy="9" r="7" fill="${ROUTE_STATION_COLOR}" stroke="white" stroke-width="3"/>
+    </svg>
+  `;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
 const getBusLabel = (location, activeRouteNo) => {
   if (location?.routeno) return `${location.routeno}번`;
   if (activeRouteNo) return `${activeRouteNo}번`;
@@ -68,6 +85,13 @@ const getBusInfoContent = (location, activeRouteNo) => {
     </div>
   `;
 };
+
+const getRouteInsightContent = (routeInsight) => `
+  <div style="padding:8px 11px;font-size:12px;line-height:1.5;white-space:nowrap;">
+    <strong style="display:block;color:#18212f;">정류소 타임라인</strong>
+    <span>${escapeHtml(routeInsight.message)}</span>
+  </div>
+`;
 
 const animateBusMarker = (kakao, marker, nextLatLng, markerKey, animationRefs) => {
   const previousLatLng = marker.getPosition();
@@ -116,6 +140,8 @@ const animateBusMarker = (kakao, marker, nextLatLng, markerKey, animationRefs) =
 function KakaoStationMap({
   station,
   stations = [],
+  routeStations = [],
+  routeInsight = null,
   busLocations = [],
   activeRouteNo,
   onSelectStation
@@ -123,9 +149,12 @@ function KakaoStationMap({
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const markerRefs = useRef([]);
+  const routeMarkerRefs = useRef([]);
+  const routePolylineRef = useRef(null);
   const busMarkerRefs = useRef(new Map());
   const busAnimationRefs = useRef(new Map());
   const infoWindowRef = useRef(null);
+  const routeInsightWindowRef = useRef(null);
   const busInfoWindowRef = useRef(null);
   const [kakaoMaps, setKakaoMaps] = useState(null);
   const [mapError, setMapError] = useState(null);
@@ -234,6 +263,90 @@ function KakaoStationMap({
   useEffect(() => {
     if (!kakaoMaps || !mapRef.current) return undefined;
 
+    if (routePolylineRef.current) {
+      routePolylineRef.current.setMap(null);
+      routePolylineRef.current = null;
+    }
+
+    routeMarkerRefs.current.forEach((marker) => marker.setMap(null));
+    routeMarkerRefs.current = [];
+
+    const routePath = getRoutePath(routeStations);
+    if (routePath.length >= 2) {
+      const polylinePath = routePath.map((position) => new kakaoMaps.maps.LatLng(position.lat, position.lng));
+      routePolylineRef.current = new kakaoMaps.maps.Polyline({
+        path: polylinePath,
+        strokeWeight: 5,
+        strokeColor: ROUTE_LINE_COLOR,
+        strokeOpacity: 0.85,
+        strokeStyle: 'solid'
+      });
+      routePolylineRef.current.setMap(mapRef.current);
+
+      const bounds = new kakaoMaps.maps.LatLngBounds();
+      polylinePath.forEach((latLng) => bounds.extend(latLng));
+      if (!station) mapRef.current.setBounds(bounds);
+    }
+
+    const markerSize = new kakaoMaps.maps.Size(18, 18);
+    const markerOption = { offset: new kakaoMaps.maps.Point(9, 9) };
+    const markerImage = new kakaoMaps.maps.MarkerImage(createRouteStationMarkerSvgUrl(), markerSize, markerOption);
+
+    routeStations.forEach((routeStation) => {
+      const position = getRouteStationPosition(routeStation);
+      if (!position) return;
+
+      const marker = new kakaoMaps.maps.Marker({
+        position: new kakaoMaps.maps.LatLng(position.lat, position.lng),
+        title: routeStation.nodenm,
+        image: markerImage
+      });
+      marker.setMap(mapRef.current);
+      marker.setZIndex(2);
+      routeMarkerRefs.current.push(marker);
+
+      kakaoMaps.maps.event.addListener(marker, 'click', () => {
+        if (onSelectStation) onSelectStation(routeStation);
+      });
+    });
+
+    return undefined;
+  }, [kakaoMaps, onSelectStation, routeStations, station]);
+
+  useEffect(() => {
+    if (!kakaoMaps || !mapRef.current) return undefined;
+
+    if (routeInsightWindowRef.current) {
+      routeInsightWindowRef.current.close();
+      routeInsightWindowRef.current = null;
+    }
+
+    if (!routeInsight || !station) return undefined;
+
+    const position = getRouteStationPosition(station);
+    if (!position) return undefined;
+
+    const marker = new kakaoMaps.maps.Marker({
+      position: new kakaoMaps.maps.LatLng(position.lat, position.lng),
+      opacity: 0
+    });
+    marker.setMap(mapRef.current);
+
+    const infoWindow = new kakaoMaps.maps.InfoWindow({
+      content: getRouteInsightContent(routeInsight)
+    });
+    infoWindow.open(mapRef.current, marker);
+    routeInsightWindowRef.current = infoWindow;
+
+    return () => {
+      marker.setMap(null);
+      infoWindow.close();
+    };
+  }, [kakaoMaps, routeInsight, station]);
+
+  useEffect(() => {
+    if (!kakaoMaps || !mapRef.current) return undefined;
+
     const markerSize = new kakaoMaps.maps.Size(42, 42);
     const markerOption = { offset: new kakaoMaps.maps.Point(21, 21) };
     const markerImage = new kakaoMaps.maps.MarkerImage(createBusMarkerSvgUrl(), markerSize, markerOption);
@@ -300,12 +413,15 @@ function KakaoStationMap({
 
   useEffect(() => () => {
     markerRefs.current.forEach((marker) => marker.setMap(null));
+    routeMarkerRefs.current.forEach((marker) => marker.setMap(null));
+    if (routePolylineRef.current) routePolylineRef.current.setMap(null);
     busMarkerRefs.current.forEach(({ marker }) => marker.setMap(null));
     busAnimationRefs.current.forEach((frameId) => {
       if (typeof window !== 'undefined') window.cancelAnimationFrame(frameId);
     });
 
     if (infoWindowRef.current) infoWindowRef.current.close();
+    if (routeInsightWindowRef.current) routeInsightWindowRef.current.close();
     if (busInfoWindowRef.current) busInfoWindowRef.current.close();
   }, []);
 

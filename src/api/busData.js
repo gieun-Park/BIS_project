@@ -33,3 +33,33 @@ export const getBusLocationKey = (location, index = 0) => {
   const positionKey = location?.nodeid ?? location?.nodeord ?? index;
   return `${routeKey}-${positionKey}`;
 };
+
+const getNumericCoordinate = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+export const getRouteStationPosition = (station) => {
+  const lat = getNumericCoordinate(station?.gpslati);
+  const lng = getNumericCoordinate(station?.gpslong);
+
+  if (!lat || !lng) return null;
+  return { lat, lng };
+};
+
+export const sortRouteStations = (stations = []) =>
+  [...stations].sort((a, b) => {
+    const leftOrder = Number(a.nodeord);
+    const rightOrder = Number(b.nodeord);
+
+    if (Number.isFinite(leftOrder) && Number.isFinite(rightOrder)) {
+      return leftOrder - rightOrder;
+    }
+
+    return String(a.nodenm ?? '').localeCompare(String(b.nodenm ?? ''), 'ko-KR');
+  });
+
+export const getRoutePath = (stations = []) =>
+  sortRouteStations(stations)
+    .map((station) => getRouteStationPosition(station))
+    .filter(Boolean);

@@ -4,6 +4,8 @@ import {
   filterBusStops,
   getBusLocationKey,
   getBusLocationPosition,
+  getRoutePath,
+  getRouteStationPosition,
   normalizeBusLocations,
   normalizeItems
 } from './busData.js';
@@ -70,5 +72,26 @@ describe('getBusLocationKey', () => {
       getBusLocationKey({ routeid: 'CWB379001000', nodeid: 'CWB379000573' }, 2),
       'CWB379001000-CWB379000573'
     );
+  });
+});
+
+describe('getRoutePath', () => {
+  it('sorts route stations and returns usable map coordinates', () => {
+    const stations = [
+      { nodeid: 'N2', nodeord: '2', gpslati: '35.2', gpslong: '128.2' },
+      { nodeid: 'N1', nodeord: '1', gpslati: '35.1', gpslong: '128.1' },
+      { nodeid: 'N0', nodeord: '0', gpslati: '0', gpslong: '128.0' }
+    ];
+
+    assert.deepEqual(getRoutePath(stations), [
+      { lat: 35.1, lng: 128.1 },
+      { lat: 35.2, lng: 128.2 }
+    ]);
+  });
+});
+
+describe('getRouteStationPosition', () => {
+  it('returns null when a route station has invalid coordinates', () => {
+    assert.equal(getRouteStationPosition({ gpslati: '0', gpslong: '128.1' }), null);
   });
 });

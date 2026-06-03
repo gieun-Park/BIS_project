@@ -1,6 +1,14 @@
 // src/screens/BusArrivalScreen.jsx
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getLiveBusArrival, getRouteBusLocations, searchBusStops } from '../api/busApi';
+import {
+  getLiveBusArrival,
+  getRouteBusLocations,
+  getRouteInsight,
+  getRouteStations,
+  searchBusRoutes,
+  searchBusStops
+} from '../api/busApi';
+import { resolveIntegratedSearch } from '../api/searchData';
 import {
   addRecentStation,
   isFavoriteStation,
@@ -15,6 +23,11 @@ import KakaoStationMap from '../components/KakaoStationMap';
 const AUTO_REFRESH_INTERVAL_MS = 30000;
 const BUS_LOCATION_REFRESH_INTERVAL_MS = 10000;
 const SEARCH_DEBOUNCE_MS = 450;
+const SEARCH_MODES = [
+  ['all', '전체'],
+  ['station', '정류장'],
+  ['route', '버스']
+];
 
 const formatLastUpdated = (date) =>
   date
@@ -47,10 +60,15 @@ const getBusLocationErrorMessage = (error) => {
 
 function BusArrivalScreen() {
   const [stationQuery, setStationQuery] = useState('');
+  const [searchMode, setSearchMode] = useState('all');
   const [stationResults, setStationResults] = useState([]);
+  const [routeResults, setRouteResults] = useState([]);
   const [selectedStation, setSelectedStation] = useState(null);
-  const [arrivalData, setArrivalData] = useState([]); 
+  const [arrivalData, setArrivalData] = useState([]);
+  const [activeRoute, setActiveRoute] = useState(null);
   const [selectedRouteId, setSelectedRouteId] = useState(null);
+  const [routeStations, setRouteStations] = useState([]);
+  const [routeInsight, setRouteInsight] = useState(null);
   const [busLocations, setBusLocations] = useState([]);
   const [favoriteStations, setFavoriteStations] = useState(() => readFavoriteStations());
   const [recentStations, setRecentStations] = useState(() => readRecentStations());
@@ -59,8 +77,10 @@ function BusArrivalScreen() {
   const [busLocationUpdatedAt, setBusLocationUpdatedAt] = useState(null);
   const [searching, setSearching] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
   const [busLocationLoading, setBusLocationLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [routeError, setRouteError] = useState(null);
   const [busLocationError, setBusLocationError] = useState(null);
   const [searchMessage, setSearchMessage] = useState(null);
 
@@ -82,84 +102,148 @@ function BusArrivalScreen() {
     }
   }, [selectedRouteId]);
 
-  const loadArrivalData = useCallback(async (nodeId = selectedStation?.nodeid) => {
+  const loadRouteStationData = useCallback(async (routeId) => {
+    if (!routeId) {
+      setRouteStations([]);
+      return;
+    }
+
+    setRouteLoading(true);
+    setRouteError(null);
+
+    try {
+      const stations = await getRouteStations(routeId);
+      setRouteStations(stations);
+    } catch (err) {
+      console.error('노선 정류소 로드 실패:', err);
+      setRouteStations([]);
+      setRouteError('노선 경유 정류소를 불러오지 못했습니다.');
+    } finally {
+      setRouteLoading(false);
+    }
+  }, []);
+
+  const loadRouteInsight = useCallback(async (routeId = selectedRouteId, nodeId = selectedStation?.nodeid) => {
+    if (!routeId || !nodeId) {
+      setRouteInsight(null);
+      return;
+    }
+
+    try {
+      const insight = await getRouteInsight(routeId, nodeId);
+      setRouteInsight(insight);
+    } catch (err) {
+      console.error('정류소 타임라인 로드 실패:', err);
+      setRouteInsight(null);
+    }
+  }, [selectedRouteId, selectedStation]);
+
+  const loadArrivalData = useCallback(async (nodeId = selectedStation?.nodeid, options = {}) => {
     if (!nodeId) return;
 
+    const preserveRoute = Boolean(options.preserveRoute);
     setLoading(true);
     setError(null);
+
     try {
       const data = await getLiveBusArrival(nodeId);
       setArrivalData(data);
       setLastUpdatedAt(new Date());
-      if (!data.some((bus) => bus.routeid)) {
-        setBusLocations([]);
-        setBusLocationUpdatedAt(null);
-        setBusLocationError(null);
-      }
-      setSelectedRouteId((currentRouteId) => {
-        const currentRoute = data.find((bus) => bus.routeid && bus.routeid === currentRouteId);
-        const firstRoute = data.find((bus) => bus.routeid);
+      const firstRoute = data.find((bus) => bus.routeid);
 
-        return currentRoute?.routeid ?? firstRoute?.routeid ?? null;
+      if (!preserveRoute && firstRoute?.routeid) {
+        setActiveRoute(null);
+        loadRouteStationData(firstRoute.routeid);
+      }
+
+      setSelectedRouteId((currentRouteId) => {
+        if (preserveRoute && currentRouteId) return currentRouteId;
+
+        return firstRoute?.routeid ?? null;
       });
     } catch {
-      setError("실시간 버스 도착 정보를 불러오지 못했습니다.");
+      setError('실시간 버스 도착 정보를 불러오지 못했습니다.');
     } finally {
       setLoading(false);
     }
-  }, [selectedStation]);
+  }, [loadRouteStationData, selectedStation]);
 
   useEffect(() => {
     if (!autoRefresh || !selectedStation) return undefined;
 
     const intervalId = window.setInterval(() => {
-      loadArrivalData(selectedStation.nodeid);
+      loadArrivalData(selectedStation.nodeid, { preserveRoute: Boolean(activeRoute) });
     }, AUTO_REFRESH_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [autoRefresh, loadArrivalData, selectedStation]);
+  }, [activeRoute, autoRefresh, loadArrivalData, selectedStation]);
 
   useEffect(() => {
-    if (!selectedRouteId || !selectedStation) return undefined;
+    if (!selectedRouteId) return undefined;
 
     const timeoutId = window.setTimeout(() => {
       loadBusLocationData(selectedRouteId);
+      loadRouteInsight(selectedRouteId, selectedStation?.nodeid);
     }, 0);
 
     const intervalId = window.setInterval(() => {
       loadBusLocationData(selectedRouteId);
+      loadRouteInsight(selectedRouteId, selectedStation?.nodeid);
     }, BUS_LOCATION_REFRESH_INTERVAL_MS);
 
     return () => {
       window.clearTimeout(timeoutId);
       window.clearInterval(intervalId);
     };
-  }, [loadBusLocationData, selectedRouteId, selectedStation]);
+  }, [loadBusLocationData, loadRouteInsight, selectedRouteId, selectedStation]);
 
   const performSearch = useCallback(async (queryValue) => {
     const query = queryValue.trim();
+    const minimumLength = searchMode === 'route' ? 1 : 2;
     setSearchMessage(null);
     setError(null);
+    setRouteError(null);
 
-    if (query.length < 2) {
+    if (query.length < minimumLength) {
       setStationResults([]);
-      setSearchMessage('정류소명을 두 글자 이상 입력해주세요.');
+      setRouteResults([]);
+      setSearchMessage(
+        searchMode === 'route'
+          ? '버스번호를 한 글자 이상 입력해주세요.'
+          : '정류소명 또는 버스번호를 두 글자 이상 입력해주세요.'
+      );
       return;
     }
 
     setSearching(true);
     try {
-      const stops = await searchBusStops(query);
+      const {
+        stationResults: stops,
+        routeResults: routes,
+        hasPartialFailure
+      } = await resolveIntegratedSearch({
+        query,
+        searchMode,
+        searchStops: searchBusStops,
+        searchRoutes: searchBusRoutes
+      });
+
       setStationResults(stops);
-      setSearchMessage(stops.length === 0 ? '검색된 정류소가 없습니다.' : null);
+      setRouteResults(routes);
+      setSearchMessage(
+        hasPartialFailure
+          ? '일부 검색 정보를 불러오지 못했습니다. 검색 유형을 바꿔 다시 시도할 수 있습니다.'
+          : stops.length === 0 && routes.length === 0 ? '검색 결과가 없습니다.' : null
+      );
     } catch (err) {
-      console.error('정류소 검색 실패:', err);
+      console.error('통합 검색 실패:', err);
       setStationResults([]);
-      setSearchMessage('정류소 검색 정보를 불러오지 못했습니다. 버스정류소정보 API 활용신청을 확인해주세요.');
+      setRouteResults([]);
+      setSearchMessage('검색 정보를 불러오지 못했습니다. API 서버와 활용신청 상태를 확인해주세요.');
     } finally {
       setSearching(false);
     }
-  }, []);
+  }, [searchMode]);
 
   const handleQueryChange = (event) => {
     const nextQuery = event.target.value;
@@ -167,21 +251,23 @@ function BusArrivalScreen() {
 
     if (nextQuery.trim().length < 2) {
       setStationResults([]);
+      setRouteResults([]);
       if (nextQuery.trim().length === 0) setSearchMessage(null);
     }
   };
 
   useEffect(() => {
     const query = stationQuery.trim();
+    const minimumLength = searchMode === 'route' ? 1 : 2;
 
-    if (query.length < 2) return undefined;
+    if (query.length < minimumLength) return undefined;
 
     const timeoutId = window.setTimeout(() => {
       performSearch(query);
     }, SEARCH_DEBOUNCE_MS);
 
     return () => window.clearTimeout(timeoutId);
-  }, [performSearch, stationQuery]);
+  }, [performSearch, searchMode, stationQuery]);
 
   const handleSearch = (event) => {
     event.preventDefault();
@@ -189,14 +275,23 @@ function BusArrivalScreen() {
   };
 
   const handleSelectStation = useCallback((station) => {
+    const preserveRoute = Boolean(activeRoute);
+
     setSelectedStation(station);
     setStationQuery(station.nodenm);
     setArrivalData([]);
-    setSelectedRouteId(null);
-    setBusLocations([]);
     setLastUpdatedAt(null);
-    setBusLocationUpdatedAt(null);
-    setBusLocationError(null);
+    setError(null);
+
+    if (!preserveRoute) {
+      setActiveRoute(null);
+      setSelectedRouteId(null);
+      setRouteStations([]);
+      setRouteInsight(null);
+      setBusLocations([]);
+      setBusLocationUpdatedAt(null);
+      setBusLocationError(null);
+    }
 
     setRecentStations((currentStations) => {
       const nextStations = addRecentStation(currentStations, station);
@@ -204,14 +299,39 @@ function BusArrivalScreen() {
       return nextStations;
     });
 
-    loadArrivalData(station.nodeid);
-  }, [loadArrivalData]);
+    loadArrivalData(station.nodeid, { preserveRoute });
+    if (activeRoute?.routeid) loadRouteInsight(activeRoute.routeid, station.nodeid);
+  }, [activeRoute, loadArrivalData, loadRouteInsight]);
+
+  const handleSelectRouteResult = useCallback((route) => {
+    if (!route.routeid) return;
+
+    setActiveRoute(route);
+    setSelectedRouteId(route.routeid);
+    setBusLocations([]);
+    setBusLocationUpdatedAt(null);
+    setBusLocationError(null);
+    setRouteInsight(null);
+    loadRouteStationData(route.routeid);
+    loadBusLocationData(route.routeid);
+    if (selectedStation?.nodeid) loadRouteInsight(route.routeid, selectedStation.nodeid);
+  }, [loadBusLocationData, loadRouteInsight, loadRouteStationData, selectedStation]);
 
   const handleSelectRoute = useCallback((bus) => {
     if (!bus.routeid) return;
 
+    const nextRoute = {
+      routeid: bus.routeid,
+      routeno: bus.routeno ?? '',
+      routetp: bus.routetp ?? '',
+      startnodenm: '',
+      endnodenm: ''
+    };
+    setActiveRoute(nextRoute);
+
     if (bus.routeid === selectedRouteId) {
       loadBusLocationData(bus.routeid);
+      loadRouteInsight(bus.routeid, selectedStation?.nodeid);
       return;
     }
 
@@ -219,7 +339,9 @@ function BusArrivalScreen() {
     setBusLocations([]);
     setBusLocationUpdatedAt(null);
     setBusLocationError(null);
-  }, [loadBusLocationData, selectedRouteId]);
+    setRouteInsight(null);
+    loadRouteStationData(bus.routeid);
+  }, [loadBusLocationData, loadRouteInsight, loadRouteStationData, selectedRouteId, selectedStation]);
 
   const handleToggleFavorite = () => {
     if (!selectedStation) return;
@@ -240,6 +362,8 @@ function BusArrivalScreen() {
     () => arrivalData.find((bus) => bus.routeid && bus.routeid === selectedRouteId) ?? null,
     [arrivalData, selectedRouteId]
   );
+
+  const displayRoute = activeRoute ?? selectedRoute;
 
   const quickStations = useMemo(() => {
     const stationMap = new Map();
@@ -271,11 +395,24 @@ function BusArrivalScreen() {
       </section>
 
       <section className="search-panel">
+        <div className="search-tabs" role="tablist" aria-label="검색 유형">
+          {SEARCH_MODES.map(([mode, label]) => (
+            <button
+              key={mode}
+              type="button"
+              className={searchMode === mode ? 'search-tabs__button search-tabs__button--active' : 'search-tabs__button'}
+              onClick={() => setSearchMode(mode)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         <form className="search-panel__form" onSubmit={handleSearch}>
           <input
             value={stationQuery}
             onChange={handleQueryChange}
-            placeholder="정류소명 입력"
+            placeholder="정류소명 또는 버스번호 입력"
           />
           <button type="submit" disabled={searching}>
             {searching ? '검색 중' : '검색'}
@@ -307,14 +444,34 @@ function BusArrivalScreen() {
       <KakaoStationMap
         station={selectedStation}
         stations={stationResults}
+        routeStations={routeStations}
+        routeInsight={routeInsight}
         busLocations={busLocations}
-        activeRouteNo={selectedRoute?.routeno}
+        activeRouteNo={displayRoute?.routeno}
         onSelectStation={handleSelectStation}
       />
 
-      {selectedRoute && (
+      {displayRoute && (
+        <section className="route-status" aria-live="polite">
+          <div>
+            <strong>{displayRoute.routeno}번 노선</strong>
+            <span>{routeStations.length}개 정류소 · {busLocations.length}대 운행 표시</span>
+          </div>
+          {routeLoading && <em>노선 불러오는 중</em>}
+        </section>
+      )}
+
+      {routeInsight && (
+        <p className="status-message status-message--info">{routeInsight.message}</p>
+      )}
+
+      {routeError && (
+        <p className="status-message status-message--warn">{routeError}</p>
+      )}
+
+      {displayRoute && (
         <section className="bus-location-status" aria-live="polite">
-          <strong>{selectedRoute.routeno}번 위치</strong>
+          <strong>{displayRoute.routeno}번 위치</strong>
           <span>
             {busLocationLoading && busLocations.length === 0
               ? '위치 불러오는 중'
@@ -327,7 +484,7 @@ function BusArrivalScreen() {
         <p className="status-message status-message--warn">{busLocationError}</p>
       )}
 
-      <section className="station-results" aria-label="검색 결과">
+      <section className="station-results" aria-label="정류장 검색 결과">
         {stationResults.map((station) => (
           <button
             key={`${station.nodeid}-${station.nodeno ?? ''}`}
@@ -346,6 +503,28 @@ function BusArrivalScreen() {
           </button>
         ))}
       </section>
+
+      {routeResults.length > 0 && (
+        <section className="route-results" aria-label="버스 검색 결과">
+          {routeResults.map((route) => (
+            <button
+              key={route.routeid}
+              type="button"
+              onClick={() => handleSelectRouteResult(route)}
+              className={activeRoute?.routeid === route.routeid ? 'route-result route-result--active' : 'route-result'}
+            >
+              <span>
+                <strong>{route.routeno}번</strong>
+                <small>
+                  {route.routetp || '노선'}
+                  {route.startnodenm || route.endnodenm ? ` · ${route.startnodenm} → ${route.endnodenm}` : ''}
+                </small>
+              </span>
+              <span className="route-result__arrow">노선 보기</span>
+            </button>
+          ))}
+        </section>
+      )}
 
       <section className="arrival-panel">
         <div className="arrival-panel__top">
