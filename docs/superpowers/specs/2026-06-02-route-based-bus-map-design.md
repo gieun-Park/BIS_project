@@ -20,7 +20,7 @@ Relevant files:
 - `src/components/KakaoStationMap.jsx`: Kakao map, station markers, bus markers, marker animation
 - `src/api/busApi.js`: public-data calls for stations, arrivals, and route bus locations
 - `src/api/busData.js`: public-data normalization helpers
-- `src/api/apiClient.js`: arrival API client with env-based service key
+- `server/tagoClient.js`: server-side public-data request helper with env-based service key
 - `src/api/kakaoMap.js`: Kakao Maps SDK loader
 
 There is no backend server yet. External public-data service calls are still made from the browser, so the next implementation should move public-data calls behind a small Node API server.
@@ -63,7 +63,7 @@ The frontend should call these local endpoints:
 - `GET /api/routes/:routeId/locations`
 - `GET /api/routes/:routeId/insight?nodeId={nodeId}`
 
-The route search endpoint should use the TAGO bus route information service to load the route list for the configured city and filter by route number on the backend. This avoids depending on uncertain route-number query support from the upstream service.
+The route search endpoint should use the TAGO bus route information service with the user's query passed as `routeNo`. Calling `getRouteNoList` without `routeNo` returns `403 Forbidden` for this service, while route-number searches return normal route data.
 
 ## External Services
 
@@ -144,8 +144,8 @@ Route search:
 
 1. User types a bus number.
 2. Frontend calls `/api/routes?query={query}`.
-3. Backend loads or reuses cached city route list.
-4. Backend filters route numbers and returns normalized routes.
+3. Backend calls the route service with `routeNo={query}` or reuses the cached result for that query.
+4. Backend normalizes the returned routes.
 5. User selects a route.
 6. Frontend loads route stations and route locations.
 7. Map draws route line and moving bus markers.
